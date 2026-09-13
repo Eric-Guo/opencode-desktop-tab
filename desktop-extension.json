@@ -1,0 +1,14 @@
+{
+  "apiVersion": 1,
+  "main": "src/main/index.ts",
+  "renderer": "src/renderer/index.tsx",
+  "preload": "src/preload/index.ts",
+  "preloads": {
+    "tabbar": "src/preload/tabbar.ts",
+    "external-tab": "src/preload/external-tab.ts"
+  },
+  "assets": {
+    "desktop-tab/tabbar.html": "src/renderer/tabbar.html",
+    "7777": "../7777/dist"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@opencode/desktop-tab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "typecheck": "tsgo --noEmit",
+    "test": "bun test ./src ./test",
+    "dev": "OPENCODE_DESKTOP_EXTENSION=../desktop-tab bun --cwd ../desktop dev",
+    "build": "bun --cwd ../7777 run build && OPENCODE_DESKTOP_EXTENSION=../desktop-tab bun --cwd ../desktop build",
+    "test:electron": "bun test/electron.ts"
+  },
+  "dependencies": {
+    "jsonc-parser": "3.3.1",
+    "electron-context-menu": "4.1.2"
+  },
+  "peerDependencies": {
+    "@opencode/desktop": "^2.0.3",
+    "electron": "^42.10.1"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.0",
+    "@types/node": "24.12.2",
+    "@typescript/native-preview": "7.0.0-dev.20251207.1"
+  }
+}
