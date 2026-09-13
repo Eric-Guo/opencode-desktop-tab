@@ -33,13 +33,24 @@ bun run test:electron
 
 `bun dev` starts the existing desktop development workflow with this extension selected. It accepts the desktop script's server options. `bun run build` first builds 7777, then runs desktop's normal prebuild/build with the extension selected. Packaged assets and preloads are copied into desktop's `out` directory and included by the existing Electron packager; the source checkout is not needed at runtime.
 
-Equivalent host command, from `packages/desktop`:
+To start development directly from `packages/desktop`:
+
+```sh
+OPENCODE_DESKTOP_EXTENSION=../desktop-tab bun run dev
+```
+
+The host's `dev` command rebuilds from source and defaults to the base desktop when the extension is not selected. A previous extension-enabled build does not change that default. An environment variable prefixed to one command applies only to that command; use the prefix again for each host command, or use this package's `dev` and `build` scripts to select the extension automatically.
+
+To build and package for macOS from `packages/desktop`, after preparing the sibling 7777 renderer with `bun run build` in `packages/7777`:
 
 ```sh
 OPENCODE_DESKTOP_EXTENSION=../desktop-tab bun run build
+OPENCODE_DESKTOP_EXTENSION=../desktop-tab bun run package:mac
 ```
 
-For an already prepared sidecar and 7777 bundle, use `OPENCODE_DESKTOP_EXTENSION=../desktop-tab bunx --no-install electron-vite build` to rebuild only Electron assets. To build the base desktop without this checkout, use `OPENCODE_DESKTOP_EXTENSION=none bun run build` from desktop. Set the extension environment variable in your distribution CI before the host build; desktop defaults to no extension.
+After `bun run build` from this package, you can go directly to the host packaging command above. Keep the same prefix with `package`, `package:win`, or `package:linux`. Packaging consumes desktop's current `out` directory without rebuilding it; setting the variable only at packaging time cannot add the extension to a base desktop build.
+
+For an already prepared sidecar and 7777 bundle, use `OPENCODE_DESKTOP_EXTENSION=../desktop-tab bunx --no-install electron-vite build` to rebuild only Electron assets. To build the base desktop without this checkout, use `OPENCODE_DESKTOP_EXTENSION=none bun run build` from desktop. Set the extension environment variable in your distribution CI for the host build and packaging commands; desktop defaults to no extension.
 
 `desktop-extension.json` declares the main, preload, renderer, and asset entry points. Its `7777` asset points at the sibling renderer build. A distribution without a bundled 7777 tab can remove that asset entry. `ELECTRON_7777_RENDERER_URL` still selects its development server; otherwise bundled HTML is used.
 
