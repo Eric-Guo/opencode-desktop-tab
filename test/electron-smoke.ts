@@ -44,6 +44,8 @@ async function main() {
     }),
   )
   await app.whenReady()
+  extension.environment!({ resourcesPath: directory })
+  assert.equal(process.env.OPENCODE_CONFIG_DIR, directory)
   await extension.initialize!()
   assert.deepEqual(extension.serviceCors!(), [origin])
   Object.entries(extension.ipc!({ connection: async () => ({ url: origin, password: "fixture-password" }) })).forEach(
@@ -164,6 +166,13 @@ async function main() {
     assert.equal(commands.at(-1), "sso.login")
     assert.equal(await first.shell.primary.executeJavaScript("window.desktopTabAccount.currentUser()"), null)
     assert.equal(await extension.request!(first.shell.primary, "account.current-user"), null)
+    let stopped = false
+    await extension.beforeQuit!({
+      async stopService() {
+        stopped = true
+      },
+    })
+    assert(stopped)
     const closed = new Promise<void>((resolve) => first.shell.primary.once("destroyed", resolve))
     first.shell.dispose()
     second.shell.dispose()

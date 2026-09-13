@@ -14,6 +14,7 @@ import {
 import { restoreSession, setSitePermissions } from "./sessions"
 import { loadSsoBearerApiKey, getCybrosCurrentUser, signInToThapeSso } from "./thape-sso"
 import { createTabController } from "./tabs"
+import { configureEnvironment } from "./environment"
 
 const clients = new Map<
   number,
@@ -35,11 +36,16 @@ function register(contents: WebContents, client: Omit<NonNullable<ReturnType<typ
 
 const extension: DesktopExtension = {
   apiVersion: 1,
+  environment(host) {
+    configureEnvironment(host.resourcesPath, app.isPackaged, process.env)
+  },
   async initialize() {
     tabs = loadDesktopTabs()
     const key = await loadSsoBearerApiKey(app.getPath("userData"), process.env.THAPE_SSO_BEARER_API_KEY)
     if (key) process.env.THAPE_SSO_BEARER_API_KEY = key
   },
+  // The next launch must start a service with the credentials saved by account sign-in.
+  beforeQuit: (host) => host.stopService(),
   serviceCors: () => [
     ...new Set(tabs.flatMap((tab) => ("url" in tab && tab.localServer ? [new URL(tab.url).origin] : []))),
   ],
