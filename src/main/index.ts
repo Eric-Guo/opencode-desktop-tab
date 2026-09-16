@@ -28,6 +28,7 @@ const clients = new Map<
 >()
 const refresh = new Set<() => void>()
 let tabs: ReturnType<typeof loadDesktopTabs> = []
+let configDirectory: string | undefined
 
 function register(contents: WebContents, client: Omit<NonNullable<ReturnType<typeof clients.get>>, "contents">) {
   clients.set(contents.id, { contents, ...client })
@@ -37,10 +38,10 @@ function register(contents: WebContents, client: Omit<NonNullable<ReturnType<typ
 const extension: DesktopExtension = {
   apiVersion: 1,
   environment(host) {
-    configureEnvironment(host.resourcesPath, app.isPackaged, process.env)
+    configDirectory = configureEnvironment(host.resourcesPath, app.isPackaged, process.env)
   },
   async initialize() {
-    tabs = loadDesktopTabs()
+    tabs = loadDesktopTabs(configDirectory)
     const key = await loadSsoBearerApiKey(app.getPath("userData"), process.env.THAPE_SSO_BEARER_API_KEY)
     if (key) process.env.THAPE_SSO_BEARER_API_KEY = key
   },

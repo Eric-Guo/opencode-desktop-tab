@@ -34,8 +34,7 @@ export type ExternalDesktopTab = DesktopTabBase & {
 
 export type DesktopTab = OpenCodeDesktopTab | RendererDesktopTab | ExternalDesktopTab
 
-export function loadDesktopTabs() {
-  const configDir = process.env.OPENCODE_CONFIG_DIR?.trim()
+export function loadDesktopTabs(configDir = process.env.OPENCODE_CONFIG_DIR?.trim()) {
   if (!configDir) throw new Error("OPENCODE_CONFIG_DIR is required to load desktop tabs")
 
   const source = join(configDir, "sigmaagents.jsonc")
