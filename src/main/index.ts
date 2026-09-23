@@ -15,6 +15,7 @@ import { restoreSession, setSitePermissions } from "./sessions"
 import { loadSsoBearerApiKey, getCybrosCurrentUser, signInToThapeSso } from "./thape-sso"
 import { createTabController } from "./tabs"
 import { configureEnvironment } from "./environment"
+import { localRendererOptions } from "./local-renderer"
 
 const clients = new Map<
   number,
@@ -48,7 +49,7 @@ const extension: DesktopExtension = {
   // The next launch must start a service with the credentials saved by account sign-in.
   beforeQuit: (host) => host.stopService(),
   serviceCors: () => [
-    ...new Set(tabs.flatMap((tab) => ("url" in tab && tab.localServer ? [new URL(tab.url).origin] : []))),
+    ...new Set(tabs.flatMap((tab) => (tab.type === "web" && tab.localServer ? [new URL(tab.url).origin] : []))),
   ],
   rendererData(contents) {
     return {
@@ -120,20 +121,19 @@ function createWindow(host: DesktopWindowHost) {
   const controller = createTabController(tabs, {
     primary,
     create(tab) {
-      if ("html" in tab) {
-        const view = host.createRenderer({
-          id: tab.id,
-          html: tab.html,
-          devHtml: tab.devHtml,
-          devURL: process.env.ELECTRON_7777_RENDERER_URL ?? false,
-        })
-        register(view.webContents, { role: "renderer", initialization: initialization(tab) })
-        return view
+      switch (tab.type) {
+        case "primary":
+          return primary
+        case "local": {
+          const view = host.createRenderer(localRendererOptions(tab, process.env))
+          register(view.webContents, { role: "renderer", initialization: initialization(tab) })
+          return view
+        }
+        case "web":
+          return createSite(host, tab, host.storage.get(namespace, tab.id), (url) =>
+            host.storage.set(namespace, tab.id, url),
+          )
       }
-      if (!("url" in tab)) return primary
-      return createSite(host, tab, host.storage.get(namespace, tab.id), (url) =>
-        host.storage.set(namespace, tab.id, url),
-      )
     },
     attach(view) {
       configureContextMenu(view)

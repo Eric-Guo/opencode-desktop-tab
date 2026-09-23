@@ -26,10 +26,14 @@ try {
   })
   if (!build.success) throw new AggregateError(build.logs)
   await Bun.write(join(directory, "smoke.mjs"), build.outputs[0]!)
-  process.exitCode = await Bun.spawn([String(electron), join(directory, "smoke.mjs")], {
-    env: { ...process.env, DESKTOP_TAB_TEST_DIR: directory },
-    stdio: ["ignore", "inherit", "inherit"],
-  }).exited
+  // The temporary macOS profile must not prompt for access to the user's real Keychain.
+  process.exitCode = await Bun.spawn(
+    [String(electron), ...(process.platform === "darwin" ? ["--use-mock-keychain"] : []), join(directory, "smoke.mjs")],
+    {
+      env: { ...process.env, DESKTOP_TAB_TEST_DIR: directory },
+      stdio: ["ignore", "inherit", "inherit"],
+    },
+  ).exited
 } finally {
   await rm(directory, { recursive: true, force: true })
 }

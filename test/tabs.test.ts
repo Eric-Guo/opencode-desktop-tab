@@ -3,8 +3,9 @@ import { createTabController } from "../src/main/tabs"
 import type { DesktopTab } from "../src/main/desktop-tabs"
 
 const tabs: DesktopTab[] = [
-  { id: "opencode", title: "OpenCode", label: "O", skipDisplay: true },
+  { type: "primary", id: "opencode", title: "OpenCode", label: "O", skipDisplay: true },
   {
+    type: "web",
     id: "site",
     title: "Site",
     label: "S",
@@ -13,7 +14,16 @@ const tabs: DesktopTab[] = [
     partition: "site",
     releaseWhenLostFocus: true,
   },
-  { id: "renderer", title: "Renderer", label: "R", skipDisplay: false, html: "7777/index.html" },
+  { type: "local", id: "renderer", title: "Renderer", label: "R", skipDisplay: false, html: "7777/index.html" },
+  {
+    type: "local",
+    id: "second",
+    title: "Second",
+    label: "2",
+    skipDisplay: true,
+    html: "7777/index.html",
+    releaseWhenLostFocus: true,
+  },
 ]
 function fixture() {
   const releases: string[] = []
@@ -67,4 +77,22 @@ test("unknown selections preserve the active page and window controllers are ind
   first.controller.dispose()
   expect(first.releases).toEqual(["opencode", "site"])
   expect(second.releases).toEqual([])
+})
+
+test("multiple local agents sharing a renderer keep separate views and obey their own release policy", () => {
+  const f = fixture()
+  f.controller.select("renderer")
+  const retained = f.controller.active()
+  f.controller.select("second")
+  const released = f.controller.active()
+  expect(released).not.toBe(retained)
+  expect(retained.visible).toBe(false)
+  expect(released.visible).toBe(true)
+  f.controller.select("renderer")
+  expect(f.controller.active()).toBe(retained)
+  expect(f.releases).toEqual(["second"])
+  f.controller.select("second")
+  expect(f.controller.active()).not.toBe(released)
+  f.controller.dispose()
+  expect(f.releases).toEqual(["second", "opencode", "renderer", "second"])
 })

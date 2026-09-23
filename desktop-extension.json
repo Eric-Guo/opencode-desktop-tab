@@ -7,6 +7,9 @@
     "tabbar": "src/preload/tabbar.ts",
     "external-tab": "src/preload/external-tab.ts"
   },
+  "builds": {
+    "../7777": "build"
+  },
   "assets": {
     "desktop-tab/tabbar.html": "src/renderer/tabbar.html",
     "7777": "../7777/dist"

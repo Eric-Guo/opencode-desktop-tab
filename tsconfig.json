@@ -11,5 +11,5 @@
     "types": ["bun", "node", "electron"],
     "allowSyntheticDefaultImports": true
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "scripts"]
 }

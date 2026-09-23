@@ -31,7 +31,7 @@ bun test
 bun run test:electron
 ```
 
-`bun dev` starts the existing desktop development workflow with this extension selected. It accepts the desktop script's server options. `bun run build` first builds 7777, then runs desktop's normal prebuild/build with the extension selected. Packaged assets and preloads are copied into desktop's `out` directory and included by the existing Electron packager; the source checkout is not needed at runtime.
+`bun dev` starts the existing desktop development workflow with this extension selected. It accepts the desktop script's server options. `bun run build` runs each project/script pair in the manifest's `builds` map in order (currently 7777), then runs desktop's normal prebuild/build with the extension selected. A failed step stops the build and preserves its exit code. Packaged assets and preloads are copied into desktop's `out` directory and included by the existing Electron packager; the source checkout is not needed at runtime.
 
 To start development directly from `packages/desktop`:
 
@@ -52,7 +52,62 @@ After `bun run build` from this package, you can go directly to the host packagi
 
 For an already prepared sidecar and 7777 bundle, use `OPENCODE_DESKTOP_EXTENSION=../desktop-tab bunx --no-install electron-vite build` to rebuild only Electron assets. To build the base desktop without this checkout, use `OPENCODE_DESKTOP_EXTENSION=none bun run build` from desktop. Set the extension environment variable in your distribution CI for the host build and packaging commands; desktop defaults to no extension.
 
-`desktop-extension.json` declares the main, preload, renderer, and asset entry points. Its `7777` asset points at the sibling renderer build. A distribution without a bundled 7777 tab can remove that asset entry. `ELECTRON_7777_RENDERER_URL` still selects its development server; otherwise bundled HTML is used.
+`desktop-extension.json` declares the main, preload, renderer, and asset entry points. Its `7777` asset points at the sibling renderer build. The extension's build script also reads its `builds` map; the API 1 host continues to consume the existing entry points and `assets` map. A distribution without a bundled 7777 tab can remove both its asset and build entries. `ELECTRON_7777_RENDERER_URL` still selects its development server; otherwise bundled HTML is used.
+
+## Configuring web and local agents
+
+Tabs are validated and normalized once in `src/main/desktop-tabs.ts` into three types. `type` is optional in JSONC, so existing configurations need no migration:
+
+| Type      | Source                                          | Loading                                                                              |
+| --------- | ----------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `primary` | Reserved `id: "opencode"`                       | Host's main renderer; always available for settings and sign-in                      |
+| `web`     | `url` and `partition`                           | External view with the narrow site preload and existing navigation/permission policy |
+| `local`   | `html`, optionally `devHtml` and `devServerEnv` | Bundled renderer created through the host's trusted renderer API                     |
+
+Without `type`, `opencode` selects the primary renderer, `url` selects a web tab, and `html` selects a local tab. Unknown types, incomplete sources, and mixed web/local source fields are rejected with the config filename and entry index. `localServer` belongs to web tabs: it enables their existing local-service access and does not change the tab's type.
+
+`id` identifies the tab and its view lifetime. `localAgent` selects the agent supplied to that view; it need not match the tab ID or the renderer asset directory. All three types support `localAgent`, `welcomeText`, and `suggestedQuestions`. Multiple local agents can reuse the same `html` bundle with different IDs and initialization data. `skipDisplay`, `releaseWhenLostFocus`, and `systemControlColor` retain their existing behavior.
+
+For example, future entries can be added to `desktopTabs` without changing the controller, IPC, or window creation code:
+
+```jsonc
+{
+  "id": "web-agent",
+  "type": "web",
+  "title": "Web agent",
+  "label": "Web",
+  "url": "https://example.com/agent",
+  "partition": "persist:desktop-tab-web-agent",
+  "localServer": true,
+  "localAgent": "web-agent",
+},
+{
+  "id": "local-agent",
+  "type": "local",
+  "title": "Local agent",
+  "label": "Local",
+  "html": "7777/index.html",
+  "devHtml": "index.html",
+  "localAgent": "local-agent",
+  "welcomeText": "Welcome",
+  "suggestedQuestions": ["How can you help?"],
+}
+```
+
+These are examples only; the corresponding server agent must also exist. Reusing a renderer requires that renderer to support the requested agent through its initialization data.
+
+Each local tab uses `ELECTRON_<TAB_ID>_RENDERER_URL` for its optional development server. The ID is uppercased and non-alphanumeric characters become underscores: `local-agent` uses `ELECTRON_LOCAL_AGENT_RENDERER_URL`. Set `devServerEnv` to a different environment variable name to share a server or override this convention. For example, a tab reusing 7777 can set `"devServerEnv": "ELECTRON_7777_RENDERER_URL"`. An unset or blank variable selects bundled HTML; local tabs never inherit the host's primary development server or another tab's server implicitly. `devHtml` is the entry path relative to the selected development server.
+
+For a distinct local renderer bundle, add its build and packaged asset mapping to `desktop-extension.json` alongside the existing entries:
+
+```json
+{
+  "builds": { "../my-renderer": "build" },
+  "assets": { "my-renderer": "../my-renderer/dist" }
+}
+```
+
+Paths are relative to this extension checkout; each `builds` value names that project's package script. Point the tab's `html` at `my-renderer/index.html`. A second agent that reuses an existing bundle needs only its tab configuration, with no additional build entry. Web tabs need no renderer build or packaged asset entry.
 
 ## Compatibility
 

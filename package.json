@@ -8,7 +8,7 @@
     "typecheck": "tsgo --noEmit",
     "test": "bun test ./src ./test",
     "dev": "OPENCODE_DESKTOP_EXTENSION=../desktop-tab bun --cwd ../desktop dev",
-    "build": "bun run --cwd ../7777 build && OPENCODE_DESKTOP_EXTENSION=../desktop-tab bun run --cwd ../desktop build",
+    "build": "bun scripts/build.ts",
     "test:electron": "bun test/electron.ts"
   },
   "dependencies": {

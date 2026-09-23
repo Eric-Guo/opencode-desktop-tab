@@ -18,15 +18,19 @@ type DesktopTabBase = DesktopTabInitialization & {
 }
 
 type OpenCodeDesktopTab = DesktopTabBase & {
+  type: "primary"
   id: "opencode"
 }
 
 export type RendererDesktopTab = DesktopTabBase & {
+  type: "local"
   html: string
   devHtml?: string
+  devServerEnv?: string
 }
 
 export type ExternalDesktopTab = DesktopTabBase & {
+  type: "web"
   url: string
   partition: string
   localServer?: boolean
@@ -62,6 +66,9 @@ export function parseDesktopTabs(text: string, source = "sigmaagents.jsonc") {
 function parseDesktopTab(value: unknown, index: number, source: string): DesktopTab {
   if (!isRecord(value)) throw invalidTab(index, source)
   if (!isString(value.id) || !isString(value.title) || !isString(value.label)) throw invalidTab(index, source)
+  if (value.type !== undefined && value.type !== "primary" && value.type !== "web" && value.type !== "local") {
+    throw invalidTab(index, source)
+  }
   if (value.skipDisplay !== undefined && typeof value.skipDisplay !== "boolean") throw invalidTab(index, source)
   if (value.releaseWhenLostFocus !== undefined && typeof value.releaseWhenLostFocus !== "boolean") {
     throw invalidTab(index, source)
@@ -88,18 +95,57 @@ function parseDesktopTab(value: unknown, index: number, source: string): Desktop
     ...(value.releaseWhenLostFocus === undefined ? {} : { releaseWhenLostFocus: value.releaseWhenLostFocus }),
     ...(value.systemControlColor === undefined ? {} : { systemControlColor: value.systemControlColor }),
   }
-  if (isString(value.url) && isString(value.partition) && URL.canParse(value.url)) {
+  const type = value.type ?? (value.id === "opencode" ? "primary" : value.url !== undefined ? "web" : "local")
+  if (type === "primary") {
+    if (
+      value.id !== "opencode" ||
+      value.url !== undefined ||
+      value.partition !== undefined ||
+      value.html !== undefined ||
+      value.devHtml !== undefined ||
+      value.devServerEnv !== undefined ||
+      value.localServer !== undefined
+    )
+      throw invalidTab(index, source)
+    return { ...base, type, id: "opencode" }
+  }
+  if (value.id === "opencode") throw invalidTab(index, source)
+  if (type === "web") {
+    if (
+      !isString(value.url) ||
+      !URL.canParse(value.url) ||
+      !isString(value.partition) ||
+      value.html !== undefined ||
+      value.devHtml !== undefined ||
+      value.devServerEnv !== undefined
+    )
+      throw invalidTab(index, source)
     return {
       ...base,
+      type,
       url: value.url,
       partition: value.partition,
       ...(value.localServer === undefined ? {} : { localServer: value.localServer }),
     }
   }
-  if (isString(value.html) && (value.devHtml === undefined || isString(value.devHtml))) {
-    return { ...base, html: value.html, ...(value.devHtml === undefined ? {} : { devHtml: value.devHtml }) }
+  if (type === "local") {
+    if (
+      !isString(value.html) ||
+      (value.devHtml !== undefined && !isString(value.devHtml)) ||
+      (value.devServerEnv !== undefined && !isString(value.devServerEnv)) ||
+      value.url !== undefined ||
+      value.partition !== undefined ||
+      value.localServer !== undefined
+    )
+      throw invalidTab(index, source)
+    return {
+      ...base,
+      type,
+      html: value.html,
+      ...(value.devHtml === undefined ? {} : { devHtml: value.devHtml }),
+      ...(value.devServerEnv === undefined ? {} : { devServerEnv: value.devServerEnv }),
+    }
   }
-  if (value.id === "opencode") return { ...base, id: "opencode" }
   throw invalidTab(index, source)
 }
 

@@ -3,7 +3,8 @@ import { createServer } from "node:http"
 import { app, BrowserWindow, WebContentsView, ipcMain } from "electron"
 import type { WebContents } from "electron"
 import { join } from "node:path"
-import { writeFile } from "node:fs/promises"
+import { mkdir, writeFile } from "node:fs/promises"
+import type { DesktopWindowHost } from "@opencode/desktop/extension"
 import extension from "../src/main/index"
 
 const directory = process.env.DESKTOP_TAB_TEST_DIR!
@@ -22,6 +23,13 @@ async function main() {
   const address = server.address()
   assert(address && typeof address === "object")
   const origin = `http://127.0.0.1:${address.port}`
+  process.env.ELECTRON_7777_RENDERER_URL = origin + "/legacy/"
+  delete process.env.ELECTRON_LOCAL_TWO_RENDERER_URL
+  await mkdir(join(directory, "local-two"))
+  await writeFile(
+    join(directory, "local-two/index.html"),
+    "<!doctype html><title>Local Two</title><body>Bundled agent</body>",
+  )
   await writeFile(
     join(directory, "sigmaagents.jsonc"),
     JSON.stringify({
@@ -40,6 +48,28 @@ async function main() {
           releaseWhenLostFocus: true,
         },
         { id: "other", title: "Other", label: "X", url: origin, partition: "persist:smoke" },
+        {
+          id: "7777",
+          title: "7777",
+          label: "7777",
+          html: "7777/index.html",
+          devHtml: "index.html",
+          localAgent: "7777",
+          welcomeText: "First agent",
+          suggestedQuestions: ["First question"],
+          releaseWhenLostFocus: true,
+        },
+        {
+          type: "local",
+          id: "local-two",
+          title: "Local Two",
+          label: "Two",
+          html: "local-two/index.html",
+          localAgent: "second-agent",
+          welcomeText: "Second agent",
+          suggestedQuestions: ["Second question"],
+          systemControlColor: "#123456",
+        },
       ],
     }),
   )
@@ -70,12 +100,15 @@ async function main() {
       webPreferences: { backgroundThrottling: false },
     })
     const contents: WebContents[] = []
+    const renderers: Parameters<DesktopWindowHost["createRenderer"]>[0][] = []
+    const colors: (string | undefined)[] = []
     const shell = extension.createWindow!({
       window: win,
       id,
       preloadRoot: directory,
       storage,
-      createRenderer() {
+      createRenderer(options) {
+        renderers.push(options)
         const view = new WebContentsView({
           webPreferences: {
             preload: join(directory, "index.cjs"),
@@ -85,7 +118,11 @@ async function main() {
           },
         })
         contents.push(view.webContents)
-        void view.webContents.loadURL(origin)
+        void (options.id === "opencode"
+          ? view.webContents.loadURL(origin)
+          : options.devURL
+            ? view.webContents.loadURL(new URL(options.devHtml ?? options.html, options.devURL).href)
+            : view.webContents.loadFile(join(directory, options.html)))
         return view
       },
       trackContents: (value) => {
@@ -99,10 +136,12 @@ async function main() {
       command: (id) => {
         commands.push(id)
       },
-      setControlColor() {},
+      setControlColor: (color) => {
+        colors.push(color)
+      },
       log: (message, error) => console.error(message, error),
     })
-    return { win, shell, bar: contents[0]! }
+    return { win, shell, bar: contents[0]!, renderers, colors, contents }
   }
   async function loaded(contents: WebContents) {
     while (!contents.getURL() || contents.isLoadingMainFrame()) await new Promise((resolve) => setTimeout(resolve, 10))
@@ -113,7 +152,11 @@ async function main() {
     await loaded(first.shell.primary)
     assert.equal(first.shell.contentView!.getBounds().x, 80)
     assert.equal(first.shell.contentView!.getVisible(), true)
-    assert.equal(await first.bar.executeJavaScript("document.querySelectorAll('#tabs button').length"), 2)
+    assert.equal(await first.bar.executeJavaScript("document.querySelectorAll('#tabs button').length"), 4)
+    assert.deepEqual(
+      first.renderers.map((options) => options.id),
+      ["opencode"],
+    )
     assert.equal(
       await first.bar.executeJavaScript("document.querySelector('#back').getAttribute('aria-label')"),
       "Back",
@@ -135,6 +178,35 @@ async function main() {
     await first.bar.executeJavaScript("window.desktopTabs.select('site')")
     await loaded(first.shell.active())
     assert.equal(first.shell.active().getURL(), origin + "/page2")
+    await first.bar.executeJavaScript("window.desktopTabs.select('7777')")
+    const legacy = first.shell.active()
+    await loaded(legacy)
+    assert.equal(legacy.getURL(), origin + "/legacy/index.html")
+    assert.deepEqual(extension.rendererData!(legacy), {
+      localAgent: "7777",
+      welcomeText: "First agent",
+      suggestedQuestions: ["First question"],
+    })
+    await first.bar.executeJavaScript("window.desktopTabs.select('local-two')")
+    const local = first.shell.active()
+    await loaded(local)
+    assert(legacy.isDestroyed())
+    assert.equal(await local.executeJavaScript("document.title"), "Local Two")
+    assert.equal(first.renderers.at(-1)!.devURL, false)
+    assert.equal(first.colors.at(-1), "#123456")
+    assert.deepEqual(extension.rendererData!(local), {
+      localAgent: "second-agent",
+      welcomeText: "Second agent",
+      suggestedQuestions: ["Second question"],
+    })
+    await first.bar.executeJavaScript("window.desktopTabs.select('7777')")
+    assert.notEqual(first.shell.active(), legacy)
+    await loaded(first.shell.active())
+    assert.equal(extension.rendererData!(first.shell.active()).localAgent, "7777")
+    await first.bar.executeJavaScript("window.desktopTabs.select('local-two')")
+    assert.equal(first.shell.active(), local)
+    await first.bar.executeJavaScript("window.desktopTabs.select('site')")
+    await loaded(first.shell.active())
     const second = create("second")
     await loaded(second.bar)
     await second.bar.executeJavaScript("window.desktopTabs.select('other')")
@@ -173,16 +245,22 @@ async function main() {
       },
     })
     assert(stopped)
-    const closed = new Promise<void>((resolve) => first.shell.primary.once("destroyed", resolve))
+    const closed = Promise.all(
+      [...first.contents, ...second.contents]
+        .filter((contents) => !contents.isDestroyed())
+        .map((contents) => new Promise<void>((resolve) => contents.once("destroyed", resolve))),
+    )
     first.shell.dispose()
     second.shell.dispose()
     await closed
     assert(first.shell.primary.isDestroyed())
+    assert(local.isDestroyed())
+    assert(first.bar.isDestroyed())
     first.win.destroy()
     second.win.destroy()
     stranger.destroy()
     console.log(
-      "Electron smoke passed: UI, lazy sites, release/restore, initialization, multi-window isolation, sender/origin checks, login action, disposal",
+      "Electron smoke passed: UI, mixed local/web agents, dev/bundled renderers, release/restore, initialization, multi-window isolation, sender/origin checks, login action, disposal",
     )
     clearTimeout(timeout)
     server.close()
