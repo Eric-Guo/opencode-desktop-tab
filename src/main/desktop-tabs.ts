@@ -1,11 +1,13 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { parse, type ParseError } from "jsonc-parser"
+import type { AgentStorageKeys } from "../shared/api"
 
 export type DesktopTabInitialization = {
   localAgent?: string
   welcomeText?: string
   suggestedQuestions?: string[]
+  storageKeys?: AgentStorageKeys
 }
 
 type DesktopTabBase = DesktopTabInitialization & {
@@ -77,6 +79,7 @@ function parseDesktopTab(value: unknown, index: number, source: string): Desktop
   if (value.localServer !== undefined && typeof value.localServer !== "boolean") throw invalidTab(index, source)
   if (value.localAgent !== undefined && !isString(value.localAgent)) throw invalidTab(index, source)
   if (value.welcomeText !== undefined && !isString(value.welcomeText)) throw invalidTab(index, source)
+  if (value.storageKeys !== undefined && !isStorageKeys(value.storageKeys)) throw invalidTab(index, source)
   if (
     value.suggestedQuestions !== undefined &&
     (!Array.isArray(value.suggestedQuestions) || !value.suggestedQuestions.every(isString))
@@ -92,6 +95,7 @@ function parseDesktopTab(value: unknown, index: number, source: string): Desktop
     ...(value.localAgent === undefined ? {} : { localAgent: value.localAgent }),
     ...(value.welcomeText === undefined ? {} : { welcomeText: value.welcomeText }),
     ...(value.suggestedQuestions === undefined ? {} : { suggestedQuestions: value.suggestedQuestions }),
+    ...(value.storageKeys === undefined ? {} : { storageKeys: value.storageKeys }),
     ...(value.releaseWhenLostFocus === undefined ? {} : { releaseWhenLostFocus: value.releaseWhenLostFocus }),
     ...(value.systemControlColor === undefined ? {} : { systemControlColor: value.systemControlColor }),
   }
@@ -151,6 +155,10 @@ function parseDesktopTab(value: unknown, index: number, source: string): Desktop
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function isStorageKeys(value: unknown): value is AgentStorageKeys {
+  return isRecord(value) && isString(value.sessionID) && isString(value.sessionDirectory) && isString(value.promptDraft)
 }
 
 function isString(value: unknown): value is string {

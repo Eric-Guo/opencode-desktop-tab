@@ -255,6 +255,7 @@ function initialization(tab?: DesktopTabInitialization) {
     ...(tab?.localAgent === undefined ? {} : { localAgent: tab.localAgent }),
     ...(tab?.welcomeText === undefined ? {} : { welcomeText: tab.welcomeText }),
     ...(tab?.suggestedQuestions === undefined ? {} : { suggestedQuestions: tab.suggestedQuestions }),
+    ...(tab?.storageKeys === undefined ? {} : { storageKeys: tab.storageKeys }),
   }
 }
 

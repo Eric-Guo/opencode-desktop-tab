@@ -66,7 +66,7 @@ Tabs are validated and normalized once in `src/main/desktop-tabs.ts` into three 
 
 Without `type`, `opencode` selects the primary renderer, `url` selects a web tab, and `html` selects a local tab. Unknown types, incomplete sources, and mixed web/local source fields are rejected with the config filename and entry index. `localServer` belongs to web tabs: it enables their existing local-service access and does not change the tab's type.
 
-`id` identifies the tab and its view lifetime. `localAgent` selects the agent supplied to that view; it need not match the tab ID or the renderer asset directory. All three types support `localAgent`, `welcomeText`, and `suggestedQuestions`. Multiple local agents can reuse the same `html` bundle with different IDs and initialization data. `skipDisplay`, `releaseWhenLostFocus`, and `systemControlColor` retain their existing behavior.
+`id` identifies the tab and its view lifetime. `localAgent` selects the agent supplied to that view; it need not match the tab ID or the renderer asset directory. All three types support `localAgent`, `welcomeText`, `suggestedQuestions`, and `storageKeys`. Multiple local agents can reuse the same `html` bundle with different IDs and initialization data. `skipDisplay`, `releaseWhenLostFocus`, and `systemControlColor` retain their existing behavior.
 
 For example, future entries can be added to `desktopTabs` without changing the controller, IPC, or window creation code:
 
@@ -89,12 +89,21 @@ For example, future entries can be added to `desktopTabs` without changing the c
   "html": "7777/index.html",
   "devHtml": "index.html",
   "localAgent": "local-agent",
+  "storageKeys": {
+    "sessionID": "opencode.local-agent.session.id",
+    "sessionDirectory": "opencode.local-agent.session.directory",
+    "promptDraft": "opencode.local-agent.prompt.draft"
+  },
   "welcomeText": "Welcome",
   "suggestedQuestions": ["How can you help?"],
 }
 ```
 
 These are examples only; the corresponding server agent must also exist. Reusing a renderer requires that renderer to support the requested agent through its initialization data.
+
+`storageKeys` configures the 7777-style renderer's localStorage entries for its current session ID, session directory, and composer draft. When supplied, all three values must be nonempty strings. Give independent agents different keys even when they share the same HTML bundle. The values are sent unchanged through both bundled-renderer initialization and the external-site preload; other renderers may choose whether to use them.
+
+The existing 7777 tab uses `opencode.7777.session.id`, `opencode.7777.session.directory`, and `opencode.7777.prompt.draft`, preserving saved data. Older configurations without `storageKeys` and standalone 7777 deployments retain those defaults. Changing a key selects a different storage entry; it does not migrate or delete the previous entry. Model and UI preferences and accepted-prompt history remain separate from these three keys.
 
 Each local tab uses `ELECTRON_<TAB_ID>_RENDERER_URL` for its optional development server. The ID is uppercased and non-alphanumeric characters become underscores: `local-agent` uses `ELECTRON_LOCAL_AGENT_RENDERER_URL`. Set `devServerEnv` to a different environment variable name to share a server or override this convention. For example, a tab reusing 7777 can set `"devServerEnv": "ELECTRON_7777_RENDERER_URL"`. An unset or blank variable selects bundled HTML; local tabs never inherit the host's primary development server or another tab's server implicitly. `devHtml` is the entry path relative to the selected development server.
 

@@ -43,6 +43,7 @@ async function main() {
           partition: "persist:smoke",
           localServer: true,
           localAgent: "7777",
+          storageKeys: { sessionID: "site.session", sessionDirectory: "site.directory", promptDraft: "site.draft" },
           welcomeText: "Welcome",
           suggestedQuestions: ["Question"],
           releaseWhenLostFocus: true,
@@ -56,6 +57,7 @@ async function main() {
           devHtml: "index.html",
           localAgent: "7777",
           welcomeText: "First agent",
+          storageKeys: { sessionID: "first.session", sessionDirectory: "first.directory", promptDraft: "first.draft" },
           suggestedQuestions: ["First question"],
           releaseWhenLostFocus: true,
         },
@@ -67,6 +69,11 @@ async function main() {
           html: "local-two/index.html",
           localAgent: "second-agent",
           welcomeText: "Second agent",
+          storageKeys: {
+            sessionID: "second.session",
+            sessionDirectory: "second.directory",
+            promptDraft: "second.draft",
+          },
           suggestedQuestions: ["Second question"],
           systemControlColor: "#123456",
         },
@@ -168,6 +175,11 @@ async function main() {
     const data = await site.executeJavaScript("window.api.awaitInitialization()")
     assert.equal(data.password, "fixture-password")
     assert.equal(data.localAgent, "7777")
+    assert.deepEqual(data.storageKeys, {
+      sessionID: "site.session",
+      sessionDirectory: "site.directory",
+      promptDraft: "site.draft",
+    })
     assert.deepEqual(data.suggestedQuestions, ["Question"])
     await site.loadURL(origin + "/page2")
     await first.bar.executeJavaScript("window.desktopTabs.action('settings')")
@@ -185,6 +197,7 @@ async function main() {
     assert.deepEqual(extension.rendererData!(legacy), {
       localAgent: "7777",
       welcomeText: "First agent",
+      storageKeys: { sessionID: "first.session", sessionDirectory: "first.directory", promptDraft: "first.draft" },
       suggestedQuestions: ["First question"],
     })
     await first.bar.executeJavaScript("window.desktopTabs.select('local-two')")
@@ -197,6 +210,7 @@ async function main() {
     assert.deepEqual(extension.rendererData!(local), {
       localAgent: "second-agent",
       welcomeText: "Second agent",
+      storageKeys: { sessionID: "second.session", sessionDirectory: "second.directory", promptDraft: "second.draft" },
       suggestedQuestions: ["Second question"],
     })
     await first.bar.executeJavaScript("window.desktopTabs.select('7777')")

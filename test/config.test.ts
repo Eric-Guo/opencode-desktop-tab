@@ -36,6 +36,11 @@ test("normalizes legacy and explicit tab types while keeping agent metadata inde
     html: "7777/index.html",
     devHtml: "index.html",
     localAgent: "7777",
+    storageKeys: {
+      sessionID: "opencode.7777.session.id",
+      sessionDirectory: "opencode.7777.session.directory",
+      promptDraft: "opencode.7777.prompt.draft",
+    },
     welcomeText: "# 7777\n\nWelcome",
     suggestedQuestions: ["One", "Two"],
     releaseWhenLostFocus: true,
@@ -67,6 +72,28 @@ test("normalizes legacy and explicit tab types while keeping agent metadata inde
     ...shared,
     skipDisplay: false,
   })
+})
+
+test.each(
+  [
+    null,
+    [],
+    {},
+    { sessionID: "id", sessionDirectory: "directory" },
+    { sessionID: "id", sessionDirectory: "directory", promptDraft: "" },
+    { sessionID: 5, sessionDirectory: "directory", promptDraft: "draft" },
+  ].map((storageKeys) => ({ storageKeys })),
+)("rejects incomplete or invalid storage keys: %j", ({ storageKeys }) => {
+  expect(() =>
+    parseDesktopTabs(
+      JSON.stringify({
+        desktopTabs: [
+          { id: "opencode", title: "Sigma", label: "S" },
+          { id: "agent", title: "Agent", label: "A", html: "7777/index.html", storageKeys },
+        ],
+      }),
+    ),
+  ).toThrow("Invalid desktop tab at desktopTabs[1]")
 })
 
 test.each([

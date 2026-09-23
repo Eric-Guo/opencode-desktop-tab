@@ -1,4 +1,9 @@
 export type CybrosCurrentUser = { chinese_name: string; clerk_code: string }
+export type AgentStorageKeys = {
+  sessionID: string
+  sessionDirectory: string
+  promptDraft: string
+}
 export type ServerReadyData = {
   url: string
   password?: string | null
@@ -6,6 +11,7 @@ export type ServerReadyData = {
   localAgent?: string
   welcomeText?: string
   suggestedQuestions?: string[]
+  storageKeys?: AgentStorageKeys
 }
 export type TabsState = {
   active: string
