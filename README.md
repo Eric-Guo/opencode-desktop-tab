@@ -118,6 +118,11 @@ For a distinct local renderer bundle, add its build and packaged asset mapping t
 
 Paths are relative to this extension checkout; each `builds` value names that project's package script. Point the tab's `html` at `my-renderer/index.html`. A second agent that reuses an existing bundle needs only its tab configuration, with no additional build entry. Web tabs need no renderer build or packaged asset entry.
 
+The distribution's `7777` and `plm-meeting` tabs use this shared-bundle arrangement: both load `7777/index.html`
+and share `ELECTRON_7777_RENDERER_URL`, with different server agents and session/draft keys. Keep only the existing
+`../7777` build and `7777` asset mapping. The sibling `plm-meeting` branch checkout can link its `dist` to `../7777/dist`
+for local inspection, but desktop packaging always consumes the canonical 7777 output directly.
+
 ## Compatibility
 
 Existing `OPENCODE_CONFIG_DIR/sigmaagents.jsonc` files work unchanged. Each `desktopTabs` entry retains `id`, `title`, `label`, `skipDisplay`, `releaseWhenLostFocus`, `systemControlColor`, `html`, `devHtml`, `url`, `partition`, `localServer`, `localAgent`, `welcomeText`, and `suggestedQuestions`. The hidden `opencode` tab remains available to settings and sign-in actions. Views are created lazily, retained by default, released when configured, and closed when their window closes.

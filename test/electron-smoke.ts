@@ -3,6 +3,7 @@ import { createServer } from "node:http"
 import { app, BrowserWindow, WebContentsView, ipcMain } from "electron"
 import type { WebContents } from "electron"
 import { join } from "node:path"
+import { pathToFileURL } from "node:url"
 import { mkdir, writeFile } from "node:fs/promises"
 import type { DesktopWindowHost } from "@opencode/desktop/extension"
 import extension from "../src/main/index"
@@ -25,6 +26,8 @@ async function main() {
   const origin = `http://127.0.0.1:${address.port}`
   process.env.ELECTRON_7777_RENDERER_URL = origin + "/legacy/"
   delete process.env.ELECTRON_LOCAL_TWO_RENDERER_URL
+  await mkdir(join(directory, "7777"))
+  await writeFile(join(directory, "7777/index.html"), "<!doctype html><title>Shared</title><body>Shared agent</body>")
   await mkdir(join(directory, "local-two"))
   await writeFile(
     join(directory, "local-two/index.html"),
@@ -59,6 +62,24 @@ async function main() {
           welcomeText: "First agent",
           storageKeys: { sessionID: "first.session", sessionDirectory: "first.directory", promptDraft: "first.draft" },
           suggestedQuestions: ["First question"],
+          releaseWhenLostFocus: true,
+        },
+        {
+          type: "local",
+          id: "plm-meeting",
+          title: "PLM Meeting",
+          label: "Meeting",
+          html: "7777/index.html",
+          devHtml: "index.html",
+          devServerEnv: "ELECTRON_7777_RENDERER_URL",
+          localAgent: "plm-meeting",
+          welcomeText: "Meeting agent",
+          storageKeys: {
+            sessionID: "meeting.session",
+            sessionDirectory: "meeting.directory",
+            promptDraft: "meeting.draft",
+          },
+          suggestedQuestions: ["Meeting question"],
           releaseWhenLostFocus: true,
         },
         {
@@ -159,7 +180,7 @@ async function main() {
     await loaded(first.shell.primary)
     assert.equal(first.shell.contentView!.getBounds().x, 80)
     assert.equal(first.shell.contentView!.getVisible(), true)
-    assert.equal(await first.bar.executeJavaScript("document.querySelectorAll('#tabs button').length"), 4)
+    assert.equal(await first.bar.executeJavaScript("document.querySelectorAll('#tabs button').length"), 5)
     assert.deepEqual(
       first.renderers.map((options) => options.id),
       ["opencode"],
@@ -200,10 +221,31 @@ async function main() {
       storageKeys: { sessionID: "first.session", sessionDirectory: "first.directory", promptDraft: "first.draft" },
       suggestedQuestions: ["First question"],
     })
+    await first.bar.executeJavaScript("window.desktopTabs.select('plm-meeting')")
+    const meeting = first.shell.active()
+    await loaded(meeting)
+    assert(legacy.isDestroyed())
+    assert.equal(meeting.getURL(), origin + "/legacy/index.html")
+    assert.deepEqual(first.renderers.at(-1), {
+      id: "plm-meeting",
+      html: "7777/index.html",
+      devHtml: "index.html",
+      devURL: origin + "/legacy/",
+    })
+    assert.deepEqual(extension.rendererData!(meeting), {
+      localAgent: "plm-meeting",
+      welcomeText: "Meeting agent",
+      storageKeys: {
+        sessionID: "meeting.session",
+        sessionDirectory: "meeting.directory",
+        promptDraft: "meeting.draft",
+      },
+      suggestedQuestions: ["Meeting question"],
+    })
     await first.bar.executeJavaScript("window.desktopTabs.select('local-two')")
     const local = first.shell.active()
     await loaded(local)
-    assert(legacy.isDestroyed())
+    assert(meeting.isDestroyed())
     assert.equal(await local.executeJavaScript("document.title"), "Local Two")
     assert.equal(first.renderers.at(-1)!.devURL, false)
     assert.equal(first.colors.at(-1), "#123456")
@@ -213,10 +255,22 @@ async function main() {
       storageKeys: { sessionID: "second.session", sessionDirectory: "second.directory", promptDraft: "second.draft" },
       suggestedQuestions: ["Second question"],
     })
+    delete process.env.ELECTRON_7777_RENDERER_URL
     await first.bar.executeJavaScript("window.desktopTabs.select('7777')")
     assert.notEqual(first.shell.active(), legacy)
     await loaded(first.shell.active())
     assert.equal(extension.rendererData!(first.shell.active()).localAgent, "7777")
+    assert.equal(first.shell.active().getURL(), pathToFileURL(join(directory, "7777/index.html")).href)
+    await first.bar.executeJavaScript("window.desktopTabs.select('plm-meeting')")
+    await loaded(first.shell.active())
+    assert.notEqual(first.shell.active(), meeting)
+    assert.equal(first.shell.active().getURL(), pathToFileURL(join(directory, "7777/index.html")).href)
+    assert.equal(extension.rendererData!(first.shell.active()).localAgent, "plm-meeting")
+    assert.deepEqual(extension.rendererData!(first.shell.active()).storageKeys, {
+      sessionID: "meeting.session",
+      sessionDirectory: "meeting.directory",
+      promptDraft: "meeting.draft",
+    })
     await first.bar.executeJavaScript("window.desktopTabs.select('local-two')")
     assert.equal(first.shell.active(), local)
     await first.bar.executeJavaScript("window.desktopTabs.select('site')")
@@ -274,7 +328,7 @@ async function main() {
     second.win.destroy()
     stranger.destroy()
     console.log(
-      "Electron smoke passed: UI, mixed local/web agents, dev/bundled renderers, release/restore, initialization, multi-window isolation, sender/origin checks, login action, disposal",
+      "Electron smoke passed: UI, mixed local/web agents, shared dev/bundled renderers, release/restore, initialization, multi-window isolation, sender/origin checks, login action, disposal",
     )
     clearTimeout(timeout)
     server.close()
