@@ -25,9 +25,15 @@ async function main() {
   assert(address && typeof address === "object")
   const origin = `http://127.0.0.1:${address.port}`
   process.env.ELECTRON_7777_RENDERER_URL = origin + "/legacy/"
+  process.env.ELECTRON_PLM_MEETING_RENDERER_URL = origin + "/meeting/"
   delete process.env.ELECTRON_LOCAL_TWO_RENDERER_URL
   await mkdir(join(directory, "7777"))
-  await writeFile(join(directory, "7777/index.html"), "<!doctype html><title>Shared</title><body>Shared agent</body>")
+  await writeFile(join(directory, "7777/index.html"), "<!doctype html><title>7777</title><body>Main agent</body>")
+  await mkdir(join(directory, "plm-meeting"))
+  await writeFile(
+    join(directory, "plm-meeting/index.html"),
+    "<!doctype html><title>PLM Meeting</title><body>Meeting agent</body>",
+  )
   await mkdir(join(directory, "local-two"))
   await writeFile(
     join(directory, "local-two/index.html"),
@@ -69,9 +75,9 @@ async function main() {
           id: "plm-meeting",
           title: "PLM Meeting",
           label: "Meeting",
-          html: "7777/index.html",
+          html: "plm-meeting/index.html",
           devHtml: "index.html",
-          devServerEnv: "ELECTRON_7777_RENDERER_URL",
+          devServerEnv: "ELECTRON_PLM_MEETING_RENDERER_URL",
           localAgent: "plm-meeting",
           welcomeText: "Meeting agent",
           storageKeys: {
@@ -225,12 +231,12 @@ async function main() {
     const meeting = first.shell.active()
     await loaded(meeting)
     assert(legacy.isDestroyed())
-    assert.equal(meeting.getURL(), origin + "/legacy/index.html")
+    assert.equal(meeting.getURL(), origin + "/meeting/index.html")
     assert.deepEqual(first.renderers.at(-1), {
       id: "plm-meeting",
-      html: "7777/index.html",
+      html: "plm-meeting/index.html",
       devHtml: "index.html",
-      devURL: origin + "/legacy/",
+      devURL: origin + "/meeting/",
     })
     assert.deepEqual(extension.rendererData!(meeting), {
       localAgent: "plm-meeting",
@@ -256,15 +262,18 @@ async function main() {
       suggestedQuestions: ["Second question"],
     })
     delete process.env.ELECTRON_7777_RENDERER_URL
+    delete process.env.ELECTRON_PLM_MEETING_RENDERER_URL
     await first.bar.executeJavaScript("window.desktopTabs.select('7777')")
     assert.notEqual(first.shell.active(), legacy)
     await loaded(first.shell.active())
     assert.equal(extension.rendererData!(first.shell.active()).localAgent, "7777")
     assert.equal(first.shell.active().getURL(), pathToFileURL(join(directory, "7777/index.html")).href)
+    assert.equal(await first.shell.active().executeJavaScript("document.title"), "7777")
     await first.bar.executeJavaScript("window.desktopTabs.select('plm-meeting')")
     await loaded(first.shell.active())
     assert.notEqual(first.shell.active(), meeting)
-    assert.equal(first.shell.active().getURL(), pathToFileURL(join(directory, "7777/index.html")).href)
+    assert.equal(first.shell.active().getURL(), pathToFileURL(join(directory, "plm-meeting/index.html")).href)
+    assert.equal(await first.shell.active().executeJavaScript("document.title"), "PLM Meeting")
     assert.equal(extension.rendererData!(first.shell.active()).localAgent, "plm-meeting")
     assert.deepEqual(extension.rendererData!(first.shell.active()).storageKeys, {
       sessionID: "meeting.session",
@@ -328,7 +337,7 @@ async function main() {
     second.win.destroy()
     stranger.destroy()
     console.log(
-      "Electron smoke passed: UI, mixed local/web agents, shared dev/bundled renderers, release/restore, initialization, multi-window isolation, sender/origin checks, login action, disposal",
+      "Electron smoke passed: UI, mixed local/web agents, independent dev/bundled renderers, release/restore, initialization, multi-window isolation, sender/origin checks, login action, disposal",
     )
     clearTimeout(timeout)
     server.close()

@@ -19,7 +19,7 @@ The implementation replaces the window-manager fork from `0ac1b09201^..089e35941
 
 ## Develop and build
 
-Place this checkout at `packages/desktop-tab` and the existing 7777 checkout at `packages/7777`. Run `bun install` from the OpenCode workspace to link the host peer dependency and install this package's dependencies. The host package provides Electron and the public extension types; they are not a second copy of desktop.
+Place this checkout at `packages/desktop-tab` with renderer checkouts at `packages/7777` and `packages/plm-meeting`. Run `bun install` from the OpenCode workspace to link the host peer dependency and install this package's dependencies. The host package provides Electron and the public extension types; they are not a second copy of desktop.
 
 From this directory:
 
@@ -31,7 +31,7 @@ bun test
 bun run test:electron
 ```
 
-`bun dev` starts the existing desktop development workflow with this extension selected. It accepts the desktop script's server options. `bun run build` runs each project/script pair in the manifest's `builds` map in order (currently 7777), then runs desktop's normal prebuild/build with the extension selected. A failed step stops the build and preserves its exit code. Packaged assets and preloads are copied into desktop's `out` directory and included by the existing Electron packager; the source checkout is not needed at runtime.
+`bun dev` starts the existing desktop development workflow with this extension selected. It accepts the desktop script's server options. `bun run build` runs each project/script pair in the manifest's `builds` map in order (7777, then plm-meeting), then runs desktop's normal prebuild/build with the extension selected. A failed step stops the build and preserves its exit code. Packaged assets and preloads are copied into desktop's `out` directory and included by the existing Electron packager; the source checkout is not needed at runtime.
 
 To start development directly from `packages/desktop`:
 
@@ -41,7 +41,7 @@ OPENCODE_DESKTOP_EXTENSION=../desktop-tab bun run dev
 
 The host's `dev` command rebuilds from source and defaults to the base desktop when the extension is not selected. A previous extension-enabled build does not change that default. An environment variable prefixed to one command applies only to that command; use the prefix again for each host command, or use this package's `dev` and `build` scripts to select the extension automatically.
 
-To build and package for macOS from `packages/desktop`, after preparing the sibling 7777 renderer with `bun run build` in `packages/7777`:
+To build and package for macOS from `packages/desktop`, after running `bun run build` in both `packages/7777` and `packages/plm-meeting`:
 
 ```sh
 OPENCODE_DESKTOP_EXTENSION=../desktop-tab bun run build
@@ -50,9 +50,9 @@ OPENCODE_DESKTOP_EXTENSION=../desktop-tab bun run package:mac
 
 After `bun run build` from this package, you can go directly to the host packaging command above. Keep the same prefix with `package`, `package:win`, or `package:linux`. Packaging consumes desktop's current `out` directory without rebuilding it; setting the variable only at packaging time cannot add the extension to a base desktop build.
 
-For an already prepared sidecar and 7777 bundle, use `OPENCODE_DESKTOP_EXTENSION=../desktop-tab bunx --no-install electron-vite build` to rebuild only Electron assets. To build the base desktop without this checkout, use `OPENCODE_DESKTOP_EXTENSION=none bun run build` from desktop. Set the extension environment variable in your distribution CI for the host build and packaging commands; desktop defaults to no extension.
+For an already prepared sidecar and both renderer bundles, use `OPENCODE_DESKTOP_EXTENSION=../desktop-tab bunx --no-install electron-vite build` to rebuild only Electron assets. To build the base desktop without this checkout, use `OPENCODE_DESKTOP_EXTENSION=none bun run build` from desktop. Set the extension environment variable in your distribution CI for the host build and packaging commands; desktop defaults to no extension.
 
-`desktop-extension.json` declares the main, preload, renderer, and asset entry points. Its `7777` asset points at the sibling renderer build. The extension's build script also reads its `builds` map; the API 1 host continues to consume the existing entry points and `assets` map. A distribution without a bundled 7777 tab can remove both its asset and build entries. `ELECTRON_7777_RENDERER_URL` still selects its development server; otherwise bundled HTML is used.
+`desktop-extension.json` declares the main, preload, renderer, and asset entry points. Its `7777` and `plm-meeting` assets point at their respective sibling renderer builds. The extension's build script also reads its `builds` map; the API 1 host continues to consume the existing entry points and `assets` map. A distribution without a bundled 7777 tab can remove both its asset and build entries. `ELECTRON_7777_RENDERER_URL` still selects its development server; otherwise bundled HTML is used.
 
 ## Configuring web and local agents
 
@@ -118,10 +118,12 @@ For a distinct local renderer bundle, add its build and packaged asset mapping t
 
 Paths are relative to this extension checkout; each `builds` value names that project's package script. Point the tab's `html` at `my-renderer/index.html`. A second agent that reuses an existing bundle needs only its tab configuration, with no additional build entry. Web tabs need no renderer build or packaged asset entry.
 
-The distribution's `7777` and `plm-meeting` tabs use this shared-bundle arrangement: both load `7777/index.html`
-and share `ELECTRON_7777_RENDERER_URL`, with different server agents and session/draft keys. Keep only the existing
-`../7777` build and `7777` asset mapping. The sibling `plm-meeting` branch checkout can link its `dist` to `../7777/dist`
-for local inspection, but desktop packaging always consumes the canonical 7777 output directly.
+The distribution's `7777` and `plm-meeting` tabs use separate renderer bundles from their respective branches.
+Keep both `../7777` and `../plm-meeting` build entries and their matching asset mappings. The tab configuration
+loads `7777/index.html` for 7777 and `plm-meeting/index.html` for meetings, preserving the meeting recorder UI.
+Use `ELECTRON_7777_RENDERER_URL=http://localhost:4777/` and
+`ELECTRON_PLM_MEETING_RENDERER_URL=http://localhost:4778/` for independent hot reload. Agent identity and
+session/draft keys are still supplied separately for each tab.
 
 ## Compatibility
 

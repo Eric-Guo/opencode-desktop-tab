@@ -7,12 +7,21 @@ import extension from "../desktop-extension.json"
 
 const directories: string[] = []
 
+test("packages the main and meeting renderers from their own builds", () => {
+  expect(extension.builds["../7777"]).toBe("build")
+  expect(extension.builds["../plm-meeting"]).toBe("build")
+  expect(extension.assets["7777"]).toBe("../7777/dist")
+  expect(extension.assets["plm-meeting"]).toBe("../plm-meeting/dist")
+})
+
 afterEach(async () => {
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
 })
 
 test.each([
   { projects: ["7777"], failure: "", steps: ["7777", "desktop-prebuild", "desktop"] },
+  { projects: ["7777", "plm-meeting"], failure: "", steps: ["7777", "plm-meeting", "desktop-prebuild", "desktop"] },
+  { projects: ["7777", "plm-meeting"], failure: "plm-meeting", steps: ["7777", "plm-meeting"] },
   { projects: ["7777", "second"], failure: "", steps: ["7777", "second", "desktop-prebuild", "desktop"] },
   { projects: ["7777", "second"], failure: "7777", steps: ["7777"] },
   { projects: ["7777", "second"], failure: "second", steps: ["7777", "second"] },

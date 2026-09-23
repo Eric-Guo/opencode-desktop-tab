@@ -15,7 +15,7 @@
 - Add business behavior through host callbacks. Extend the public host contract only when a capability cannot be expressed through the existing boundary; do not move site-specific behavior back into the host.
 - Keep the manifest and runtime `apiVersion` consistent. Preserve API 1 compatibility unless deliberately coordinating a version change with the host.
 - Declare entry points and packaged assets in `desktop-extension.json`. Keep the base desktop build functional when this checkout is absent or `OPENCODE_DESKTOP_EXTENSION=none` is selected.
-- Packaged code must use built assets, never source-checkout paths. Use `ELECTRON_7777_RENDERER_URL` for the optional renderer development server.
+- Packaged code must use built assets, never source-checkout paths. Use `ELECTRON_7777_RENDERER_URL` and `ELECTRON_PLM_MEETING_RENDERER_URL` for the respective optional renderer development servers.
 
 ## Configuration and window behavior
 
@@ -63,6 +63,6 @@
 - Run `bun test` for configuration, controller, navigation-policy, and SSO changes. Test the actual implementation; avoid global mocks and duplicated implementation logic in tests.
 - Run `bun run test:electron` for view, preload, IPC, layout, or disposal changes. It uses temporary profiles and local fixture pages; do not substitute the installed desktop profile or live background service. Rejected-sender and rejected-origin logs are expected assertions in this test.
 - When changing the host contract or build integration, run the host typecheck and verify both extension-enabled and base desktop builds. From `packages/desktop`, use `OPENCODE_DESKTOP_EXTENSION=../desktop-tab bunx --no-install electron-vite build` and `OPENCODE_DESKTOP_EXTENSION=none bunx --no-install electron-vite build` when sidecar and renderer assets are already prepared.
-- `bun dev` starts the extension-enabled development workflow. `bun run build` builds 7777 and runs the host's normal prebuild/build; it does more work than rebuilding Electron assets alone.
+- `bun dev` starts the extension-enabled development workflow. `bun run build` builds 7777 and plm-meeting separately and runs the host's normal prebuild/build; it does more work than rebuilding Electron assets alone.
 - Add focused regression coverage for changed behavior. Documentation-only changes do not require runtime tests.
 - Report which checks ran. Distinguish fixture-based SSO tests and local-platform Electron checks from live THAPE authentication and Windows/Linux release QA.

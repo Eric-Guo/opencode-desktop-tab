@@ -43,3 +43,22 @@ test("bundled tabs do not inherit either the primary or another agent's developm
   expect(localRendererOptions(tabs[2]!, env).devURL).toBe(false)
   expect(localRendererOptions(tabs[1]!, { ELECTRON_LOCAL_TWO_RENDERER_URL: "  " }).devURL).toBe(false)
 })
+
+test("meeting loads its own bundle unless its own development server is configured", () => {
+  const meeting = {
+    ...tabs[0]!,
+    id: "plm-meeting",
+    html: "plm-meeting/index.html",
+    devServerEnv: "ELECTRON_PLM_MEETING_RENDERER_URL",
+  }
+  const env = { ELECTRON_7777_RENDERER_URL: "http://localhost:4777/" }
+  expect(localRendererOptions(meeting, env)).toEqual({
+    id: "plm-meeting",
+    html: "plm-meeting/index.html",
+    devHtml: "index.html",
+    devURL: false,
+  })
+  expect(
+    localRendererOptions(meeting, { ...env, ELECTRON_PLM_MEETING_RENDERER_URL: "http://localhost:4778/" }).devURL,
+  ).toBe("http://localhost:4778/")
+})

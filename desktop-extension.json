@@ -8,10 +8,12 @@
     "external-tab": "src/preload/external-tab.ts"
   },
   "builds": {
-    "../7777": "build"
+    "../7777": "build",
+    "../plm-meeting": "build"
   },
   "assets": {
     "desktop-tab/tabbar.html": "src/renderer/tabbar.html",
-    "7777": "../7777/dist"
+    "7777": "../7777/dist",
+    "plm-meeting": "../plm-meeting/dist"
   }
 }
