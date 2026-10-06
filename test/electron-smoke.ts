@@ -184,6 +184,12 @@ async function main() {
     const first = create("first")
     await loaded(first.bar)
     await loaded(first.shell.primary)
+    assert.equal(first.shell.contentView instanceof WebContentsView, false)
+    assert.equal(first.shell.contentView!.children.length, 1)
+    const renderer = first.shell.contentView!.children[0]!
+    assert(renderer instanceof WebContentsView)
+    assert.equal(renderer.webContents, first.shell.primary)
+    assert.equal(renderer.getBounds().x, 0)
     assert.equal(first.shell.contentView!.getBounds().x, 80)
     assert.equal(first.shell.contentView!.getVisible(), true)
     assert.equal(await first.bar.executeJavaScript("document.querySelectorAll('#tabs button').length"), 5)

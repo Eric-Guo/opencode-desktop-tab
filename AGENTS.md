@@ -25,7 +25,7 @@
 - `skipDisplay` hides a sidebar button, not the configured tab. The `opencode` tab must remain available for settings and sign-in actions.
 - Preserve URL restoration, configured system-control colors, local agent identity, welcome text, and suggested questions.
 - Distinguish primary content from active content. Settings and login target the primary renderer; navigation and native editing actions target active content.
-- Return the primary view as the native content root so embedded browser panes follow its bounds and visibility. Keep window state isolated across windows, including windows sharing a site partition.
+- Return a plain View containing the primary renderer as the native content root so embedded browser panes are siblings above the renderer and follow its bounds and visibility. Keep window state isolated across windows, including windows sharing a site partition.
 - Permanent-close cleanup may forget window state. Application quit must retain restorable state.
 
 ## IPC, navigation, and credentials

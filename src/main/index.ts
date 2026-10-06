@@ -1,6 +1,6 @@
 import contextMenu from "electron-context-menu"
 import { copy } from "../shared/copy"
-import { app, net, WebContentsView } from "electron"
+import { app, net, View, WebContentsView } from "electron"
 import type { WebContents, IpcMainInvokeEvent } from "electron"
 import { join } from "node:path"
 import type { DesktopExtension, DesktopWindowHost } from "@opencode/desktop/extension"
@@ -115,7 +115,10 @@ function createWindow(host: DesktopWindowHost) {
   const primary = host.createRenderer({ id: "opencode", html: "index.html" })
   const initial = tabs.find((tab) => tab.id === "opencode")
   register(primary.webContents, { role: "renderer", initialization: initialization(initial) })
-  win.contentView.addChildView(primary)
+  // WebContentsView keeps its own page above child views; embeds must be siblings of the renderer.
+  const content = new View()
+  content.addChildView(primary)
+  win.contentView.addChildView(content)
   configureContextMenu(primary)
   const namespace = `opencode.desktop-tabs.${host.id.replace(/[^a-zA-Z0-9._-]/g, "-")}.dat`
   const controller = createTabController(tabs, {
@@ -142,10 +145,11 @@ function createWindow(host: DesktopWindowHost) {
       view.webContents.on("did-navigate-in-page", sendState)
     },
     release(view) {
-      if (!host.window.isDestroyed()) host.window.contentView.removeChildView(view)
+      if (!host.window.isDestroyed()) host.window.contentView.removeChildView(view === primary ? content : view)
       if (!view.webContents.isDestroyed()) view.webContents.close({ waitForBeforeUnload: false })
     },
     changed(tab) {
+      content.setVisible(tab.id === "opencode")
       host.setControlColor(tab.systemControlColor)
       win.contentView.addChildView(bar)
       layout()
@@ -168,10 +172,16 @@ function createWindow(host: DesktopWindowHost) {
     const bounds = win.getContentBounds()
     const width = Math.min(80, bounds.width)
     bar.setBounds({ x: 0, y: 0, width, height: bounds.height })
+    content.setBounds({ x: width, y: 0, width: Math.max(0, bounds.width - width), height: bounds.height })
     controller
       .views()
       .forEach((view) =>
-        view.setBounds({ x: width, y: 0, width: Math.max(0, bounds.width - width), height: bounds.height }),
+        view.setBounds({
+          x: view === primary ? 0 : width,
+          y: 0,
+          width: Math.max(0, bounds.width - width),
+          height: bounds.height,
+        }),
       )
   }
   register(bar.webContents, {
@@ -197,7 +207,7 @@ function createWindow(host: DesktopWindowHost) {
   void host.load(bar.webContents, "desktop-tab/tabbar.html").catch((error) => host.log("tab bar load failed", error))
   return {
     primary: primary.webContents,
-    contentView: primary,
+    contentView: content,
     active: () => controller.active().webContents,
     forget: () => host.storage.clear(namespace),
     dispose() {
