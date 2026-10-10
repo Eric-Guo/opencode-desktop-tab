@@ -27,11 +27,13 @@ async function main() {
   process.env.ELECTRON_7777_RENDERER_URL = origin + "/legacy/"
   process.env.ELECTRON_PLM_MEETING_RENDERER_URL = origin + "/meeting/"
   delete process.env.ELECTRON_LOCAL_TWO_RENDERER_URL
-  await mkdir(join(directory, "7777"))
-  await writeFile(join(directory, "7777/index.html"), "<!doctype html><title>7777</title><body>Main agent</body>")
-  await mkdir(join(directory, "plm-meeting"))
+  await mkdir(join(directory, "sigma-agents"))
   await writeFile(
-    join(directory, "plm-meeting/index.html"),
+    join(directory, "sigma-agents/7777.html"),
+    "<!doctype html><title>7777</title><body>Main agent</body>",
+  )
+  await writeFile(
+    join(directory, "sigma-agents/plm-meeting.html"),
     "<!doctype html><title>PLM Meeting</title><body>Meeting agent</body>",
   )
   await mkdir(join(directory, "local-two"))
@@ -62,7 +64,7 @@ async function main() {
           id: "7777",
           title: "7777",
           label: "7777",
-          html: "7777/index.html",
+          html: "sigma-agents/7777.html",
           devHtml: "index.html",
           localAgent: "7777",
           welcomeText: "First agent",
@@ -75,7 +77,7 @@ async function main() {
           id: "plm-meeting",
           title: "PLM Meeting",
           label: "Meeting",
-          html: "plm-meeting/index.html",
+          html: "sigma-agents/plm-meeting.html",
           devHtml: "index.html",
           devServerEnv: "ELECTRON_PLM_MEETING_RENDERER_URL",
           localAgent: "plm-meeting",
@@ -240,7 +242,7 @@ async function main() {
     assert.equal(meeting.getURL(), origin + "/meeting/index.html")
     assert.deepEqual(first.renderers.at(-1), {
       id: "plm-meeting",
-      html: "plm-meeting/index.html",
+      html: "sigma-agents/plm-meeting.html",
       devHtml: "index.html",
       devURL: origin + "/meeting/",
     })
@@ -273,12 +275,12 @@ async function main() {
     assert.notEqual(first.shell.active(), legacy)
     await loaded(first.shell.active())
     assert.equal(extension.rendererData!(first.shell.active()).localAgent, "7777")
-    assert.equal(first.shell.active().getURL(), pathToFileURL(join(directory, "7777/index.html")).href)
+    assert.equal(first.shell.active().getURL(), pathToFileURL(join(directory, "sigma-agents/7777.html")).href)
     assert.equal(await first.shell.active().executeJavaScript("document.title"), "7777")
     await first.bar.executeJavaScript("window.desktopTabs.select('plm-meeting')")
     await loaded(first.shell.active())
     assert.notEqual(first.shell.active(), meeting)
-    assert.equal(first.shell.active().getURL(), pathToFileURL(join(directory, "plm-meeting/index.html")).href)
+    assert.equal(first.shell.active().getURL(), pathToFileURL(join(directory, "sigma-agents/plm-meeting.html")).href)
     assert.equal(await first.shell.active().executeJavaScript("document.title"), "PLM Meeting")
     assert.equal(extension.rendererData!(first.shell.active()).localAgent, "plm-meeting")
     assert.deepEqual(extension.rendererData!(first.shell.active()).storageKeys, {

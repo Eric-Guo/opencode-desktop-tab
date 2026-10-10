@@ -6,14 +6,14 @@ const tabs = parseDesktopTabs(
   JSON.stringify({
     desktopTabs: [
       { id: "opencode", title: "Sigma", label: "Assistant" },
-      { id: "7777", title: "7777", label: "7777", html: "7777/index.html", devHtml: "index.html" },
+      { id: "7777", title: "7777", label: "7777", html: "sigma-agents/7777.html", devHtml: "index.html" },
       { id: "local-two", type: "local", title: "Two", label: "Two", html: "two/index.html", devHtml: "chat.html" },
       {
         id: "shared",
         type: "local",
         title: "Shared",
         label: "Shared",
-        html: "7777/index.html",
+        html: "sigma-agents/7777.html",
         devServerEnv: "SHARED_UI_URL",
       },
     ],
@@ -31,9 +31,9 @@ test("resolves independent dev servers and preserves the existing 7777 variable"
       }),
     ),
   ).toEqual([
-    { id: "7777", html: "7777/index.html", devHtml: "index.html", devURL: "http://localhost:7777/" },
+    { id: "7777", html: "sigma-agents/7777.html", devHtml: "index.html", devURL: "http://localhost:7777/" },
     { id: "local-two", html: "two/index.html", devHtml: "chat.html", devURL: "http://localhost:8000/" },
-    { id: "shared", html: "7777/index.html", devHtml: undefined, devURL: "http://localhost:9000/" },
+    { id: "shared", html: "sigma-agents/7777.html", devHtml: undefined, devURL: "http://localhost:9000/" },
   ])
 })
 
@@ -48,13 +48,13 @@ test("meeting loads its own bundle unless its own development server is configur
   const meeting = {
     ...tabs[0]!,
     id: "plm-meeting",
-    html: "plm-meeting/index.html",
+    html: "sigma-agents/plm-meeting.html",
     devServerEnv: "ELECTRON_PLM_MEETING_RENDERER_URL",
   }
   const env = { ELECTRON_7777_RENDERER_URL: "http://localhost:4777/" }
   expect(localRendererOptions(meeting, env)).toEqual({
     id: "plm-meeting",
-    html: "plm-meeting/index.html",
+    html: "sigma-agents/plm-meeting.html",
     devHtml: "index.html",
     devURL: false,
   })

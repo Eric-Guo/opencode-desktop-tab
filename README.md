@@ -31,7 +31,7 @@ bun test
 bun run test:electron
 ```
 
-`bun dev` starts the existing desktop development workflow with this extension selected. It accepts the desktop script's server options. `bun run build` runs each project/script pair in the manifest's `builds` map in order (7777, then plm-meeting), then runs desktop's normal prebuild/build with the extension selected. A failed step stops the build and preserves its exit code. Packaged assets and preloads are copied into desktop's `out` directory and included by the existing Electron packager; the source checkout is not needed at runtime.
+`bun dev` starts the existing desktop development workflow with this extension selected. It accepts the desktop script's server options. `bun run build` runs each project/script pair in the manifest's `builds` map in order (currently `plm-meeting` → `build:shared`), then runs desktop's normal prebuild/build with the extension selected. A failed step stops the build and preserves its exit code. Packaged assets and preloads are copied into desktop's `out` directory and included by the existing Electron packager; the source checkout is not needed at runtime.
 
 To start development directly from `packages/desktop`:
 
@@ -41,7 +41,7 @@ OPENCODE_DESKTOP_EXTENSION=../desktop-tab bun run dev
 
 The host's `dev` command rebuilds from source and defaults to the base desktop when the extension is not selected. A previous extension-enabled build does not change that default. An environment variable prefixed to one command applies only to that command; use the prefix again for each host command, or use this package's `dev` and `build` scripts to select the extension automatically.
 
-To build and package for macOS from `packages/desktop`, after running `bun run build` in both `packages/7777` and `packages/plm-meeting`:
+To build and package for macOS from `packages/desktop`, after running `bun run build:shared` in `packages/plm-meeting`:
 
 ```sh
 OPENCODE_DESKTOP_EXTENSION=../desktop-tab bun run build
@@ -52,7 +52,7 @@ After `bun run build` from this package, you can go directly to the host packagi
 
 For an already prepared sidecar and both renderer bundles, use `OPENCODE_DESKTOP_EXTENSION=../desktop-tab bunx --no-install electron-vite build` to rebuild only Electron assets. To build the base desktop without this checkout, use `OPENCODE_DESKTOP_EXTENSION=none bun run build` from desktop. Set the extension environment variable in your distribution CI for the host build and packaging commands; desktop defaults to no extension.
 
-`desktop-extension.json` declares the main, preload, renderer, and asset entry points. Its `7777` and `plm-meeting` assets point at their respective sibling renderer builds. The extension's build script also reads its `builds` map; the API 1 host continues to consume the existing entry points and `assets` map. A distribution without a bundled 7777 tab can remove both its asset and build entries. `ELECTRON_7777_RENDERER_URL` still selects its development server; otherwise bundled HTML is used.
+`desktop-extension.json` declares the main, preload, renderer, and asset entry points. Its `sigma-agents` asset points at `../plm-meeting/dist-shared`, built once with both branch entry points and shared dependencies. The extension's build script also reads its `builds` map; the API 1 host continues to consume the existing entry points and `assets` map. A distribution without bundled local agents can remove the shared asset and build entries. `ELECTRON_7777_RENDERER_URL` still selects its development server; otherwise bundled HTML is used.
 
 ## Configuring web and local agents
 
@@ -86,7 +86,7 @@ For example, future entries can be added to `desktopTabs` without changing the c
   "type": "local",
   "title": "Local agent",
   "label": "Local",
-  "html": "7777/index.html",
+  "html": "sigma-agents/7777.html",
   "devHtml": "index.html",
   "localAgent": "local-agent",
   "storageKeys": {
@@ -118,9 +118,11 @@ For a distinct local renderer bundle, add its build and packaged asset mapping t
 
 Paths are relative to this extension checkout; each `builds` value names that project's package script. Point the tab's `html` at `my-renderer/index.html`. A second agent that reuses an existing bundle needs only its tab configuration, with no additional build entry. Web tabs need no renderer build or packaged asset entry.
 
-The distribution's `7777` and `plm-meeting` tabs use separate renderer bundles from their respective branches.
-Keep both `../7777` and `../plm-meeting` build entries and their matching asset mappings. The tab configuration
-loads `7777/index.html` for 7777 and `plm-meeting/index.html` for meetings, preserving the meeting recorder UI.
+The distribution's `7777` and `plm-meeting` tabs retain the source code from their respective branches, compiled
+in one Vite build. Keep the `../plm-meeting` → `build:shared` build entry and the `sigma-agents` asset mapping.
+The tab configuration loads `sigma-agents/7777.html` and `sigma-agents/plm-meeting.html`. Shared libraries, fonts,
+and other identical assets are emitted once. Release the updated `thape-config` with the executable so both tab
+paths match the packaged entries. Each checkout can still build its standalone `dist/index.html` independently.
 Use `ELECTRON_7777_RENDERER_URL=http://localhost:4777/` and
 `ELECTRON_PLM_MEETING_RENDERER_URL=http://localhost:4778/` for independent hot reload. Agent identity and
 session/draft keys are still supplied separately for each tab.
