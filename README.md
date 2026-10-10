@@ -31,7 +31,7 @@ bun test
 bun run test:electron
 ```
 
-`bun dev` starts the existing desktop development workflow with this extension selected. It accepts the desktop script's server options. `bun run build` runs each project/script pair in the manifest's `builds` map in order (currently `plm-meeting` → `build:shared`), then runs desktop's normal prebuild/build with the extension selected. A failed step stops the build and preserves its exit code. Packaged assets and preloads are copied into desktop's `out` directory and included by the existing Electron packager; the source checkout is not needed at runtime.
+`bun dev` starts the existing desktop development workflow with this extension selected. It accepts the desktop script's server options. `bun run build` delegates to desktop's normal prebuild/build with the extension selected. The host prebuild runs each project/script pair in the manifest's `builds` map in order (currently `plm-meeting` → `build:shared`) exactly once, including when invoked directly from `packages/desktop`. It rebuilds missing or stale shared output before compiling Electron. A failed step stops the build. Packaged assets and preloads are copied into desktop's `out` directory and included by the existing Electron packager; the source checkout is not needed at runtime.
 
 To start development directly from `packages/desktop`:
 
@@ -41,7 +41,7 @@ OPENCODE_DESKTOP_EXTENSION=../desktop-tab bun run dev
 
 The host's `dev` command rebuilds from source and defaults to the base desktop when the extension is not selected. A previous extension-enabled build does not change that default. An environment variable prefixed to one command applies only to that command; use the prefix again for each host command, or use this package's `dev` and `build` scripts to select the extension automatically.
 
-To build and package for macOS from `packages/desktop`, after running `bun run build:shared` in `packages/plm-meeting`:
+To build and package for macOS from `packages/desktop`:
 
 ```sh
 OPENCODE_DESKTOP_EXTENSION=../desktop-tab bun run build
@@ -50,9 +50,17 @@ OPENCODE_DESKTOP_EXTENSION=../desktop-tab bun run package:mac
 
 After `bun run build` from this package, you can go directly to the host packaging command above. Keep the same prefix with `package`, `package:win`, or `package:linux`. Packaging consumes desktop's current `out` directory without rebuilding it; setting the variable only at packaging time cannot add the extension to a base desktop build.
 
+If `OPENCODE_DESKTOP_EXTENSION` is already exported to this checkout's absolute path, no per-command prefix or
+separate agent build is needed. From `packages/desktop`, the Windows x64 release commands remain:
+
+```sh
+RUST_TARGET=x86_64-pc-windows-msvc bun run build && \
+RUST_TARGET=x86_64-pc-windows-msvc bun run package:win -- --x64 --publish never
+```
+
 For an already prepared sidecar and both renderer bundles, use `OPENCODE_DESKTOP_EXTENSION=../desktop-tab bunx --no-install electron-vite build` to rebuild only Electron assets. To build the base desktop without this checkout, use `OPENCODE_DESKTOP_EXTENSION=none bun run build` from desktop. Set the extension environment variable in your distribution CI for the host build and packaging commands; desktop defaults to no extension.
 
-`desktop-extension.json` declares the main, preload, renderer, and asset entry points. Its `sigma-agents` asset points at `../plm-meeting/dist-shared`, built once with both branch entry points and shared dependencies. The extension's build script also reads its `builds` map; the API 1 host continues to consume the existing entry points and `assets` map. A distribution without bundled local agents can remove the shared asset and build entries. `ELECTRON_7777_RENDERER_URL` still selects its development server; otherwise bundled HTML is used.
+`desktop-extension.json` declares the main, preload, renderer, and asset entry points. Its `sigma-agents` asset points at `../plm-meeting/dist-shared/sigma-agents`, built once with both branch entry points. Its `assets` mapping merges `../plm-meeting/dist-shared/assets` into the desktop renderer's asset directory; identical content-hashed files share one packaged copy, and differing contents at the same path fail the build. The host supplies the common root favicons. The host's prebuild and development preparation read its `builds` map; the API 1 host continues to consume the existing entry points and `assets` map. A distribution without bundled local agents can remove both shared asset mappings and the build entry. `ELECTRON_7777_RENDERER_URL` still selects its development server; otherwise bundled HTML is used.
 
 ## Configuring web and local agents
 
@@ -107,7 +115,7 @@ The existing 7777 tab uses `opencode.7777.session.id`, `opencode.7777.session.di
 
 Each local tab uses `ELECTRON_<TAB_ID>_RENDERER_URL` for its optional development server. The ID is uppercased and non-alphanumeric characters become underscores: `local-agent` uses `ELECTRON_LOCAL_AGENT_RENDERER_URL`. Set `devServerEnv` to a different environment variable name to share a server or override this convention. For example, a tab reusing 7777 can set `"devServerEnv": "ELECTRON_7777_RENDERER_URL"`. An unset or blank variable selects bundled HTML; local tabs never inherit the host's primary development server or another tab's server implicitly. `devHtml` is the entry path relative to the selected development server.
 
-For a distinct local renderer bundle, add its build and packaged asset mapping to `desktop-extension.json` alongside the existing entries:
+For an unrelated renderer that cannot join the shared SigmaAgents build, add its build and packaged asset mapping to `desktop-extension.json` alongside the existing entries:
 
 ```json
 {
@@ -119,13 +127,50 @@ For a distinct local renderer bundle, add its build and packaged asset mapping t
 Paths are relative to this extension checkout; each `builds` value names that project's package script. Point the tab's `html` at `my-renderer/index.html`. A second agent that reuses an existing bundle needs only its tab configuration, with no additional build entry. Web tabs need no renderer build or packaged asset entry.
 
 The distribution's `7777` and `plm-meeting` tabs retain the source code from their respective branches, compiled
-in one Vite build. Keep the `../plm-meeting` → `build:shared` build entry and the `sigma-agents` asset mapping.
+in one Vite build. Keep the `../plm-meeting` → `build:shared` build entry and both the `sigma-agents` and `assets` mappings.
 The tab configuration loads `sigma-agents/7777.html` and `sigma-agents/plm-meeting.html`. Shared libraries, fonts,
-and other identical assets are emitted once. Release the updated `thape-config` with the executable so both tab
+and other identical assets are emitted once. Fonts, images, and WASM shared with the desktop renderer also use
+the common `assets/` directory. Release the updated `thape-config` with the executable so both tab
 paths match the packaged entries. Each checkout can still build its standalone `dist/index.html` independently.
 Use `ELECTRON_7777_RENDERER_URL=http://localhost:4777/` and
 `ELECTRON_PLM_MEETING_RENDERER_URL=http://localhost:4778/` for independent hot reload. Agent identity and
 session/draft keys are still supplied separately for each tab.
+
+## Adding another Sigma agent
+
+If the new agent can reuse an existing UI, add a `desktopTabs` entry in
+`packages/desktop/resources/thape-config/sigmaagents.jsonc` that loads `sigma-agents/7777.html` (or the meeting UI).
+Give it a unique `id`, `localAgent`, and all three `storageKeys`; add its server profile under `thape-config/agents/`.
+No renderer checkout, shared build entry, or extra asset copy is needed for this case.
+
+For an agent with a different UI branch:
+
+1. Create a sibling checkout such as `packages/my-agent`, give its package a unique workspace name, and run
+   `bun install` from the workspace root. It must provide the shared builder's expected `index.html`,
+   `src/entry.tsx`, `public/`, and `public/oc-theme-preload.js` layout. Keep its standalone `dist/` independent.
+2. Add its directory name to the `renderers` list in `packages/plm-meeting/scripts/build-shared.ts`, for example
+   `["7777", "plm-meeting", "my-agent"]`. The directory name becomes `sigma-agents/my-agent.html`. The shared build
+   resolves `@/` imports against their source checkout and compiles all entries together so dependencies can be shared.
+   It uses `plm-meeting/vite.config.ts`; integrate any new Vite plugin or worker requirements there rather than
+   assuming the new checkout's own Vite config will be loaded.
+3. Keep the one `../plm-meeting` → `build:shared` manifest build and the existing `sigma-agents` and `assets` mappings.
+   Do not add `my-agent/dist` as another packaged directory. All compiled chunks, fonts, images, workers, and WASM
+   belong in the common `assets/` output. Public files with the same path must have identical contents; namespace
+   agent-specific public files. New public files also need an appropriate manifest mapping into the desktop renderer,
+   or should be imported from source so Vite emits them into `assets/`. The host already supplies the common favicons.
+4. Add the tab to `thape-config/sigmaagents.jsonc` with `"type": "local"`, `"html": "sigma-agents/my-agent.html"`,
+   `"devHtml": "index.html"`, a unique `id`/`localAgent`, and unique session, directory, and draft storage keys.
+   Add `thape-config/agents/my-agent.md`. For hot reload, use the new checkout's own port and
+   `ELECTRON_MY_AGENT_RENDERER_URL` (or configure `devServerEnv`).
+5. Extend the shared-build fixture coverage for the new entry and check its branch-specific UI and lazy imports.
+   Run the new renderer's tests/typecheck, the shared-build tests, and the desktop build with this extension exported.
+   Verify every `sigma-agents/*.html` page loads from the packaged app, including Office previews, fonts, and workers
+   used by that agent. The host build rejects same-path assets with different contents rather than overwriting them.
+6. Release the renderer branches, desktop-tab manifest, desktop changes, and updated `thape-config` together.
+   Ensure build machines have every listed checkout before running the normal desktop build and packaging commands.
+
+`bun run build` from `packages/desktop` now performs the shared build automatically whenever this extension is
+selected. `bun run build:shared` from `packages/plm-meeting` remains available for focused renderer iteration.
 
 ## Compatibility
 

@@ -12,6 +12,7 @@
   },
   "assets": {
     "desktop-tab/tabbar.html": "src/renderer/tabbar.html",
-    "sigma-agents": "../plm-meeting/dist-shared"
+    "sigma-agents": "../plm-meeting/dist-shared/sigma-agents",
+    "assets": "../plm-meeting/dist-shared/assets"
   }
 }
